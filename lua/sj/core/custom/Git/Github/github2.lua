@@ -1,0 +1,267 @@
+--p: ╭──────────── copy_github_url ────────────╮
+local function copy_github_url()
+	-- Get the origin URL from git config
+	local handle = io.popen("git -C " .. vim.fn.getcwd() .. " config --get remote.origin.url")
+	if not handle then
+		print("Not a git repository or no origin remote")
+		return
+	end
+	local url = handle:read("*a"):gsub("%s+", "")
+	handle:close()
+
+	if url == "" then
+		print("No remote origin URL found")
+		return
+	end
+
+	-- Normalize URL: convert SSH to HTTPS or keep HTTPS
+	local https_url
+	if url:match("^git@") then
+		-- Convert ssh: git@github.com:user/repo.git => https://github.com/user/repo
+		https_url = url:gsub("^git@", "https://"):gsub(":", "/"):gsub("%.git$", "")
+	else
+		-- HTTPS url - remove trailing .git if any
+		https_url = url:gsub("%.git$", "")
+	end
+
+	-- Copy to system clipboard (using vim.fn.setreg)
+	vim.fn.setreg("+", https_url)
+	print("Copied GitHub URL to clipboard: " .. https_url)
+end
+
+vim.keymap.set("n", "<leader>gy", copy_github_url, { desc = "Copy current repo GitHub URL" })
+--p: ╰───────────── copy_github_url ─────────────╯
+
+--
+--
+--
+--p: ╭──────────── enhanced_github_contributions ────────────╮
+local function enhanced_github_contributions()
+	local date = os.date("%Y-%m-%d")
+	local current_year = os.date("%Y")
+	local current_month = os.date("%Y-%m")
+
+	-- Enhanced GraphQL query to get more data
+	local query = [[
+{
+  viewer {
+    login
+    contributionsCollection(from: "%s-01-01T00:00:00Z", to: "%s-12-31T23:59:59Z") {
+      contributionCalendar {
+        totalContributions
+        weeks {
+          contributionDays {
+            date
+            contributionCount
+            color
+          }
+        }
+      }
+      contributionYears
+      totalCommitContributions
+      totalIssueContributions
+      totalPullRequestContributions
+      totalPullRequestReviewContributions
+      totalRepositoryContributions
+      restrictedContributionsCount
+    }
+  }
+}
+    ]]
+
+	local formatted_query = string.format(query, current_year, current_year)
+	local cmd = string.format([[gh api graphql -f query='%s']], formatted_query)
+
+	local handle = io.popen(cmd)
+	if not handle then
+		vim.notify("❌ Failed to execute GitHub CLI command", vim.log.levels.ERROR)
+		return
+	end
+
+	local result = handle:read("*a")
+	handle:close()
+
+	local ok, json_data = pcall(vim.fn.json_decode, result)
+	if not ok or not json_data then
+		vim.notify("❌ Failed to parse GitHub API response", vim.log.levels.ERROR)
+		return
+	end
+
+	local data = json_data.data.viewer.contributionsCollection
+	local username = json_data.data.viewer.login
+
+	-- Calculate metrics
+	local today_contributions = 0
+	local current_streak = 0
+	local longest_streak = 0
+	local month_contributions = 0
+	local year_contributions = data.contributionCalendar.totalContributions
+	local streak_active = true
+	local temp_streak = 0
+	local longest_temp_streak = 0
+	local biggest_day_this_month = { date = "", count = 0 }
+	local biggest_day_this_year = { date = "", count = 0 }
+	local all_days = {}
+
+	-- Process all contribution days
+	for _, week in ipairs(data.contributionCalendar.weeks) do
+		for _, day in ipairs(week.contributionDays) do
+			table.insert(all_days, day)
+
+			-- Today's contributions
+			if day.date == date then
+				today_contributions = day.contributionCount
+			end
+
+			-- Month contributions
+			if day.date:sub(1, 7) == current_month then
+				month_contributions = month_contributions + day.contributionCount
+				if day.contributionCount > biggest_day_this_month.count then
+					biggest_day_this_month = { date = day.date, count = day.contributionCount }
+				end
+			end
+
+			-- Year contributions and streaks
+			if day.contributionCount > 0 then
+				temp_streak = temp_streak + 1
+				if temp_streak > longest_temp_streak then
+					longest_temp_streak = temp_streak
+				end
+
+				-- Check if this is part of current streak (consecutive up to today)
+				local day_time = os.time({
+					year = tonumber(day.date:sub(1, 4)),
+					month = tonumber(day.date:sub(6, 7)),
+					day = tonumber(day.date:sub(9, 10)),
+				})
+				local today_time = os.time()
+				local days_diff = os.difftime(today_time, day_time) / (24 * 60 * 60)
+
+				if days_diff <= current_streak then
+					current_streak = current_streak + 1
+				elseif days_diff == 1 then
+					current_streak = 2
+				end
+
+				-- Find biggest day of year
+				if day.contributionCount > biggest_day_this_year.count then
+					biggest_day_this_year = { date = day.date, count = day.contributionCount }
+				end
+			else
+				temp_streak = 0
+			end
+		end
+	end
+
+	longest_streak = longest_temp_streak
+
+	-- Create a nice display buffer
+	local buf = vim.api.nvim_create_buf(false, true)
+	local width = 60
+	local height = 20 -- Reduced height since we removed quick actions
+	local row = (vim.o.lines - height) / 2
+	local col = (vim.o.columns - width) / 2
+
+	local win = vim.api.nvim_open_win(buf, true, {
+		relative = "editor",
+		width = width,
+		height = height,
+		row = row,
+		col = col,
+		style = "minimal",
+		border = "rounded",
+	})
+
+	-- Prepare content (removed quick actions section)
+	local lines = {
+		"🚀 GitHub Contributions Dashboard",
+		" ",
+		"👤 User: @" .. username,
+		"📅 Today: " .. date,
+		" ",
+		"📊 TODAY'S CONTRIBUTIONS",
+		"  🔥 " .. today_contributions .. " contributions",
+		" ",
+		"🏆 STREAKS",
+		"  ⚡ Current Streak: " .. current_streak .. " days",
+		"  🏅 Longest Streak: " .. longest_streak .. " days",
+		" ",
+		"📈 OVERVIEW",
+		"  📦 This Month: " .. month_contributions .. " contributions",
+		"  🗓️  This Year: " .. year_contributions .. " contributions",
+		"  💾 Total Commits: " .. data.totalCommitContributions,
+		"  🐛 Total Issues: " .. data.totalIssueContributions,
+		"  🔀 Total PRs: " .. data.totalPullRequestContributions,
+		"  👀 Total PR Reviews: " .. data.totalPullRequestReviewContributions,
+		" ",
+		"🎯 PEAK PERFORMANCE",
+		"  📅 This Month: " .. biggest_day_this_month.count .. " on " .. biggest_day_this_month.date,
+		"  🏆 This Year: " .. biggest_day_this_year.count .. " on " .. biggest_day_this_year.date,
+		" ",
+		"Press 'q' or <ESC> to close",
+	}
+
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+	-- Set buffer options
+	vim.api.nvim_buf_set_option(buf, "modifiable", false)
+	vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
+
+	-- Syntax highlighting
+	vim.api.nvim_buf_add_highlight(buf, -1, "Title", 0, 0, -1)
+	vim.api.nvim_buf_add_highlight(buf, -1, "Label", 5, 0, -1)
+	vim.api.nvim_buf_add_highlight(buf, -1, "Label", 8, 0, -1)
+	vim.api.nvim_buf_add_highlight(buf, -1, "Label", 12, 0, -1)
+	vim.api.nvim_buf_add_highlight(buf, -1, "Label", 19, 0, -1)
+
+	-- Close with 'q' or Escape
+	vim.api.nvim_buf_set_keymap(buf, "n", "q", "", {
+		callback = function()
+			vim.api.nvim_win_close(win, true)
+		end,
+		noremap = true,
+		silent = true,
+	})
+
+	vim.api.nvim_buf_set_keymap(buf, "n", "<ESC>", "", {
+		callback = function()
+			vim.api.nvim_win_close(win, true)
+		end,
+		noremap = true,
+		silent = true,
+	})
+end
+
+vim.keymap.set("n", "<leader>gz", enhanced_github_contributions, {
+	noremap = true,
+	silent = true,
+	desc = "🚀 Enhanced GitHub Contributions Dashboard",
+})
+
+--p: ╰──────────── enhanced_github_contributions ────────────╯
+
+--p: ╭──────────── show_github_contrib_today ────────────╮
+local function show_github_contrib_today()
+	local date = os.date("%Y-%m-%d")
+	local cmd = table.concat({
+		"gh api graphql -f query='query { viewer { contributionsCollection { contributionCalendar { weeks { contributionDays { date contributionCount } } } } } }' | jq -r '.data.viewer.contributionsCollection.contributionCalendar.weeks[] | .contributionDays[] | select(.date == \""
+			.. date
+			.. '") | "📆 \\(.date): 🔥 \\(.contributionCount) contributions"\'',
+	}, " ")
+
+	vim.cmd("vsplit | terminal " .. cmd)
+
+	-- Add keymap to close terminal with 'q'
+	vim.cmd([[
+		tnoremap <buffer> q <C-\><C-n>:q!<CR>
+		nmap <buffer> q :q!<CR>
+	]])
+end
+
+vim.keymap.set("n", "<leader>gg", show_github_contrib_today, {
+	noremap = true,
+	silent = true,
+	desc = "📈 Show today's GitHub contributions",
+})
+
+--p: ╰───────────── show_github_contrib_today─────────────╯
