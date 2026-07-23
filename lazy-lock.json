@@ -27,6 +27,7 @@
   "grug-far.nvim": { "branch": "main", "commit": "21790e59dd0109a92a70cb874dd002af186314f5" },
   "guihua.lua": { "branch": "master", "commit": "7c364432c2f9153ed068f4eab1989edd9f3fd302" },
   "hl_match_area.nvim": { "branch": "master", "commit": "e2be159f47b036e2a8fa91549ff09110acc1856e" },
+  "hop.nvim": { "branch": "master", "commit": "08ddca799089ab96a6d1763db0b8adc5320bf050" },
   "hurl.nvim": { "branch": "main", "commit": "0e5430d5130fe95fc1b8b015491b50274aa2e796" },
   "indent-blankline.nvim": { "branch": "master", "commit": "d28a3f70721c79e3c5f6693057ae929f3d9c0a03" },
   "kulala.nvim": { "branch": "main", "commit": "6656c9d332735ca6a27725e0fb45a1715c4372d9" },
