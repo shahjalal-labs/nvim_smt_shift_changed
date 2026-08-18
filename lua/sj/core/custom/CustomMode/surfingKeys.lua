@@ -16,6 +16,23 @@ vim.keymap.set({ "n", "x", "o" }, "<leader>yw", function()
 	vim.api.nvim_win_set_cursor(old_win, old_pos)
 end, { desc = "Yank word with Hop hints (multi-window)" })
 
+-- custom yank
+
+vim.keymap.set({ "n", "x", "o" }, "<leader>yo", function()
+	local hop = require("hop")
+	local old_win = vim.api.nvim_get_current_win()
+	local old_pos = vim.api.nvim_win_get_cursor(old_win)
+
+	hop.hint_patterns({
+		pattern = '"[^"]*"', -- matches any double‑quoted string
+		multi_windows = true, -- same as your yw mapping
+	})
+
+	vim.cmd('normal! "+yi"') -- yank inner quotes to system clipboard
+	vim.api.nvim_set_current_win(old_win)
+	vim.api.nvim_win_set_cursor(old_win, old_pos)
+end, { desc = "Yank inside double quotes with Hop hints (multi‑window)" })
+
 -- Custom yank line with hints
 vim.keymap.set({ "n", "x", "o" }, "<leader>yl", function()
 	local hop = require("hop")
