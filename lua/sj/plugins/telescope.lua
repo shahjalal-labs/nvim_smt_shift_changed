@@ -29,7 +29,7 @@ return {
 		-- set keymaps
 		local keymap = vim.keymap -- for conciseness
 
-		keymap.set("n", "<leader>ff", "<cmd>Telescope find_files<cr>", { desc = "Fuzzy find files in cwd" })
+		-- keymap.set("n", "<leader>ff", "<cmd>Telescope find_files<cr>", { desc = "Fuzzy find files in cwd" })
 		keymap.set("i", "<M-e>", "<cmd>Telescope find_files<cr>", { desc = "Fuzzy find files in cwd" })
 		keymap.set("n", "<M-e>", "<cmd>Telescope find_files<cr>", { desc = "Fuzzy find files in cwd" })
 		keymap.set("n", "<leader>fr", "<cmd>Telescope oldfiles<cr>", { desc = "Fuzzy find recent files" })

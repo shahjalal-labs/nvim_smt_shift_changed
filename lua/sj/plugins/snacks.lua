@@ -85,7 +85,7 @@ return {
 				desc = "Command History",
 			},
 			{
-				"<leader>,,",
+				"<leader>ff",
 				function()
 					Snacks.explorer()
 				end,
