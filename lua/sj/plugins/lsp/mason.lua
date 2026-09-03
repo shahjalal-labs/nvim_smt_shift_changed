@@ -80,6 +80,7 @@ return {
 					"lua_ls",
 					"emmet_ls",
 					"bashls", -- Add bash language server
+					"jsonls", -- Add JSON language server
 					-- "prismals",
 					-- "pyright",
 				},

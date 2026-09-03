@@ -51,13 +51,19 @@ vim.api.nvim_set_keymap("n", "<A-o>", ":Telescope live_grep search_dirs={'src'}<
 vim.api.nvim_set_keymap("n", "<M-i>", ":qa!<CR>", { noremap = true, silent = true })
 vim.api.nvim_set_keymap("i", "<M-i>", "<ESC>:qa!<CR>", { noremap = true, silent = true })
 
---for formatting indent like vs code
-vim.api.nvim_set_keymap(
-	"n",
-	"<leader>fy",
-	":lua vim.lsp.buf.format({ async = true })<CR>",
-	{ noremap = true, silent = true }
-)
+-- for formatting indent like vs code (supports JSON, JS/TS, HTML, CSS, Lua, etc. with LSP fallback)
+vim.keymap.set({ "n", "v" }, "<leader>fy", function()
+	local ok, conform = pcall(require, "conform")
+	if ok then
+		conform.format({
+			lsp_fallback = true,
+			async = false,
+			timeout_ms = 1000,
+		})
+	else
+		vim.lsp.buf.format({ async = true })
+	end
+end, { desc = "Format file or range (like VS Code)" })
 --w:Remap Shift+F3 to insert ':'
 vim.api.nvim_set_keymap("i", "<S-F3>", ":", { noremap = true, silent = true })
 
