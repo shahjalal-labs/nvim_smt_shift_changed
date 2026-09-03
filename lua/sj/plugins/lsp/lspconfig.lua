@@ -8,8 +8,7 @@ return {
 		{ "folke/neodev.nvim", opts = {} },
 	},
 	config = function()
-		local lspconfig = require("lspconfig")
-		local mason_lspconfig = require("mason-lspconfig")
+		local mason_lspconfig_ok, mason_lspconfig = pcall(require, "mason-lspconfig")
 		local cmp_nvim_lsp = require("cmp_nvim_lsp")
 		local keymap = vim.keymap
 
@@ -67,94 +66,102 @@ return {
 				keymap.set("n", "K", vim.lsp.buf.hover, opts)
 
 				opts.desc = "Restart LSP"
-				keymap.set("n", "<leader>rs", ":LspRestart<CR>", opts)
+				keymap.set("n", "<leader>rs", ":lsp restart<CR>", opts)
 			end,
 		})
 
 		local capabilities = cmp_nvim_lsp.default_capabilities()
 
-		mason_lspconfig.setup_handlers({
-			function(server_name)
-				lspconfig[server_name].setup({
-					capabilities = capabilities,
-				})
-			end,
-			-- Add this new block for TypeScript
-			["vtsls"] = function()
-				lspconfig.vtsls.setup({
-					capabilities = capabilities,
-					settings = {
-						typescript = {
-							--[[ preferences = {
-								importModuleSpecifier = "non-relative",
-							}, ]]
-						},
-						javascript = {
-							--[[ preferences = {
-								importModuleSpecifier = "non-relative",
-							}, ]]
-						},
-					},
-				})
-			end,
+		-- Global configuration for all LSP servers
+		vim.lsp.config("*", {
+			capabilities = capabilities,
+		})
 
-			["prismals"] = function()
-				lspconfig.prismals.setup({
-					capabilities = capabilities,
-					filetypes = { "prisma" },
-				})
-			end,
+		-- Specific server configurations
+		vim.lsp.config("vtsls", {
+			settings = {
+				typescript = {
+					-- preferences = {
+					-- 	importModuleSpecifier = "non-relative",
+					-- },
+				},
+				javascript = {
+					-- preferences = {
+					-- 	importModuleSpecifier = "non-relative",
+					-- },
+				},
+			},
+		})
 
-			["svelte"] = function()
-				lspconfig["svelte"].setup({
-					capabilities = capabilities,
-					on_attach = function(client, bufnr)
-						vim.api.nvim_create_autocmd("BufWritePost", {
-							pattern = { "*.js", "*.ts" },
-							callback = function(ctx)
-								client.notify("$/onDidChangeTsOrJsFile", { uri = ctx.match })
-							end,
-						})
+		vim.lsp.config("prismals", {
+			filetypes = { "prisma" },
+		})
+
+		vim.lsp.config("svelte", {
+			on_attach = function(client, _)
+				vim.api.nvim_create_autocmd("BufWritePost", {
+					pattern = { "*.js", "*.ts" },
+					callback = function(ctx)
+						client:notify("$/onDidChangeTsOrJsFile", { uri = ctx.match })
 					end,
 				})
 			end,
-			["graphql"] = function()
-				lspconfig["graphql"].setup({
-					capabilities = capabilities,
-					filetypes = { "graphql", "gql", "svelte", "typescriptreact", "javascriptreact" },
-				})
-			end,
-			["emmet_ls"] = function()
-				lspconfig["emmet_ls"].setup({
-					capabilities = capabilities,
-					filetypes = {
-						"html",
-						"zls",
-						"typescriptreact",
-						"javascriptreact",
-						"css",
-						"sass",
-						"scss",
-						"less",
-						"svelte",
-					},
-				})
-			end,
-			["lua_ls"] = function()
-				lspconfig["lua_ls"].setup({
-					capabilities = capabilities,
-					settings = {
-						Lua = {
-							diagnostics = {
-								globals = { "vim" },
-							},
-							completion = {
-								callSnippet = "Replace",
-							},
-						},
-					},
-				})
-			end,
 		})
+
+		vim.lsp.config("graphql", {
+			filetypes = { "graphql", "gql", "svelte", "typescriptreact", "javascriptreact" },
+		})
+
+		vim.lsp.config("emmet_ls", {
+			filetypes = {
+				"html",
+				"zls",
+				"typescriptreact",
+				"javascriptreact",
+				"css",
+				"sass",
+				"scss",
+				"less",
+				"svelte",
+			},
+		})
+
+		vim.lsp.config("lua_ls", {
+			settings = {
+				Lua = {
+					diagnostics = {
+						globals = { "vim" },
+					},
+					completion = {
+						callSnippet = "Replace",
+					},
+				},
+			},
+		})
+
+		-- Enable all desired servers
+		local servers = {
+			"vtsls",
+			"html",
+			"cssls",
+			"tailwindcss",
+			"lua_ls",
+			"emmet_ls",
+			"bashls",
+			"jsonls",
+			"prismals",
+			"svelte",
+			"graphql",
+		}
+
+		for _, server in ipairs(servers) do
+			vim.lsp.enable(server)
+		end
+
+		if mason_lspconfig_ok then
+			for _, server in ipairs(mason_lspconfig.get_installed_servers()) do
+				vim.lsp.enable(server)
+			end
+		end
 	end,
 }

@@ -1,7 +1,31 @@
 return {
 	"folke/snacks.nvim",
-	event = "VeryLazy",
+	priority = 1000,
+	lazy = false,
+	init = function()
+		-- Prevent snacks.nvim from automatically rendering inline images inside code files (e.g. Next.js TSX/JSX/JS/HTML/CSS)
+		vim.api.nvim_create_autocmd("FileType", {
+			desc = "Disable inline image rendering in code files",
+			pattern = {
+				"javascript",
+				"javascriptreact",
+				"typescript",
+				"typescriptreact",
+				"html",
+				"css",
+				"scss",
+				"vue",
+				"svelte",
+			},
+			callback = function(args)
+				vim.b[args.buf].snacks_image_attached = true
+			end,
+		})
+	end,
 	opts = {
+		image = {
+			enabled = true,
+		},
 		explorer = {
 			enabled = true, -- Enables the built-in file explorer feature from snacks.nvim
 		},
@@ -52,9 +76,64 @@ return {
 		},
 	},
 	keys = function()
-		local Snacks = require("snacks")
+		local function is_hover_open()
+			local ok, _, val = pcall(debug.getupvalue, Snacks.image.doc.hover_close, 1)
+			return ok and val ~= nil
+		end
+
+		local function toggle_image_preview()
+			local cur_buf = vim.api.nvim_get_current_buf()
+
+			local function close()
+				Snacks.image.doc.hover_close()
+				pcall(vim.keymap.del, "n", "<Esc>", { buffer = cur_buf })
+				pcall(vim.keymap.del, "n", "q", { buffer = cur_buf })
+				pcall(vim.api.nvim_del_augroup_by_name, "snacks_image_hover_fast_close_" .. cur_buf)
+			end
+
+			if is_hover_open() then
+				close()
+				return
+			end
+
+			Snacks.image.hover()
+
+			local start_line = vim.api.nvim_win_get_cursor(0)[1]
+
+			-- Map <Esc> and q in current buffer to close image hover immediately
+			pcall(vim.keymap.set, "n", "<Esc>", close, { buffer = cur_buf, nowait = true, desc = "Close image preview" })
+			pcall(vim.keymap.set, "n", "q", close, { buffer = cur_buf, nowait = true, desc = "Close image preview" })
+
+			-- Fast auto-close as soon as cursor moves off current line
+			local group = vim.api.nvim_create_augroup("snacks_image_hover_fast_close_" .. cur_buf, { clear = true })
+			vim.api.nvim_create_autocmd({ "CursorMoved", "BufLeave", "InsertEnter" }, {
+				group = group,
+				buffer = cur_buf,
+				callback = function()
+					local cur_line = vim.api.nvim_win_get_cursor(0)[1]
+					if cur_line ~= start_line or not is_hover_open() then
+						close()
+						return true
+					end
+				end,
+			})
+
+			-- If no image was found on this line, clean up keymaps after short wait
+			vim.defer_fn(function()
+				if not is_hover_open() then
+					close()
+				end
+			end, 200)
+		end
 
 		return {
+			-- Image Preview Hover
+			{
+				"<leader>im",
+				toggle_image_preview,
+				desc = "Toggle Image Preview (Esc/q to close)",
+			},
+
 			-- Top Pickers & Explorer
 			{
 				"<leader>,/",

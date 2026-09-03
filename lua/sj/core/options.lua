@@ -1,3 +1,16 @@
+-- Ensure ~/.local/bin is first in PATH and filter out isolated snap paths (e.g. Yazi snap) that leak broken binaries
+local local_bin = vim.fn.expand("~/.local/bin")
+if vim.env.PATH then
+	local paths = vim.split(vim.env.PATH, ":", { plain = true })
+	local clean_paths = { local_bin }
+	for _, p in ipairs(paths) do
+		if p ~= "" and p ~= local_bin and not p:match("^/snap/yazi/") then
+			table.insert(clean_paths, p)
+		end
+	end
+	vim.env.PATH = table.concat(clean_paths, ":")
+end
+
 vim.cmd("let g:netrw_liststyle = 3")
 
 local opt = vim.opt
