@@ -11,10 +11,20 @@ end
 
 -- load snippets
 
-local filetypes = { "javascript", "typescript", "javascriptreact", "typescriptreact" }
+local js_ts_filetypes = { "javascript", "typescript", "javascriptreact", "typescriptreact" }
+local react_filetypes = { "javascriptreact", "typescriptreact", "javascript", "typescript" }
+local ts_filetypes = { "typescript", "typescriptreact" }
 
-for _, ft in ipairs(filetypes) do
+for _, ft in ipairs(js_ts_filetypes) do
 	safe_load(ft, "sj.core.custom.JsTsPro.snippets.javascript")
+end
+
+for _, ft in ipairs(react_filetypes) do
+	safe_load(ft, "sj.core.custom.JsTsPro.snippets.react")
+end
+
+for _, ft in ipairs(ts_filetypes) do
+	safe_load(ft, "sj.core.custom.JsTsPro.snippets.typescript")
 end
 
 safe_load("html", "sj.core.custom.JsTsPro.snippets.html")

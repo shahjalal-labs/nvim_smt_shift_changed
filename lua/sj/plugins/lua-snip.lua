@@ -333,8 +333,9 @@ return {
 
 			-- Basic LuaSnip settings
 			ls.config.set_config({
-				history = true,
-				updateevents = "TextChanged,TextChangedI",
+				history = false,
+				update_events = "TextChanged,TextChangedI",
+				delete_check_events = "TextChanged",
 				enable_autosnippets = true,
 			})
 
@@ -343,12 +344,50 @@ return {
 				if ls.expand_or_jumpable() then
 					ls.expand_or_jump()
 				end
-			end)
+			end, { silent = true, desc = "LuaSnip expand or jump next" })
+
 			vim.keymap.set({ "i", "s" }, "<M-k>", function()
 				if ls.jumpable(-1) then
 					ls.jump(-1)
 				end
-			end)
+			end, { silent = true, desc = "LuaSnip jump previous" })
+
+			-- Tab jumping like VS Code:
+			-- In select mode (placeholder selected), Tab jumps to next placeholder.
+			-- In insert mode at placeholder 1, Tab also jumps to next placeholder.
+			-- Inside the component JSX (node 2), Tab acts normally for indentation.
+			vim.keymap.set({ "i", "s" }, "<Tab>", function()
+				local cur_node = ls.session.current_nodes[vim.api.nvim_get_current_buf()]
+				if vim.fn.mode() == "s" or (cur_node and cur_node.pos == 1 and ls.jumpable(1)) then
+					ls.jump(1)
+				else
+					local key = vim.api.nvim_replace_termcodes("<Tab>", true, false, true)
+					vim.api.nvim_feedkeys(key, "n", false)
+				end
+			end, { silent = true, desc = "LuaSnip jump or Tab" })
+
+			vim.keymap.set({ "i", "s" }, "<S-Tab>", function()
+				if ls.jumpable(-1) then
+					ls.jump(-1)
+				else
+					local key = vim.api.nvim_replace_termcodes("<S-Tab>", true, false, true)
+					vim.api.nvim_feedkeys(key, "n", false)
+				end
+			end, { silent = true, desc = "LuaSnip jump previous or S-Tab" })
+
+			-- Clean up snippet session when leaving insert mode
+			vim.api.nvim_create_autocmd("ModeChanged", {
+				pattern = "*:n",
+				callback = function()
+					if
+						((vim.v.event.old_mode == "s" and vim.v.event.new_mode == "n") or vim.v.event.old_mode == "i")
+						and ls.session.current_nodes[vim.api.nvim_get_current_buf()]
+						and not ls.session.jump_active
+					then
+						ls.unlink_current()
+					end
+				end,
+			})
 		end,
 	},
 }
